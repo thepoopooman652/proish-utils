@@ -93,7 +93,7 @@ const config = {
             yards: 1093.61,
             feet: 3280.84,
             inches: 39370.1,
-            smoot: 0.0017018,
+            smoots: 0.0017018,
             'naut miles': 0.539957,
         },
         haversineDist: {
