@@ -18,13 +18,13 @@
 //=                           With ..2 adding some extra utilities                        =//
 //=                                          ---                                          =//
 //=                                                                                       =//
-//=  Last Updated: 2026-05-20 18:19 EST                                                   =//
+//=  Last Updated: 2026-05-20 19:26 EST                                                   =//
 //=  WIP Changes: Brainstorm and implement more utilities                                 =//
 //=  Recent Changes:                                                                      =//
-//=  - Removed the imports for the GPL v3 license text and moved the text itself          =//
-//=    into a varible (libraryInfo.license.text) and added 2 console.log statements that  =//
-//=    log a short message that states this library is being used as well as logging      =//
-//=    the GPL text and copyright info that is required to be included by GPLv3           =//
+//=  - Added "smoots" to the conversion list for utils.trig.haversineDistance             =//
+//=                                                                                       =//
+//=                                                                                       =//
+//=                                                                                       =//
 //=                                                                                       =//
 //=========================================================================================//
 
@@ -93,6 +93,7 @@ const config = {
             yards: 1093.61,
             feet: 3280.84,
             inches: 39370.1,
+            smoot: 0.0017018,
             'naut miles': 0.539957,
         },
         haversineDist: {
