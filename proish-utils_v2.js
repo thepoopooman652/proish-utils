@@ -18,13 +18,13 @@
 //=                           With ..2 adding some extra utilities                        =//
 //=                                          ---                                          =//
 //=                                                                                       =//
-//=  Last Updated: 2026-05-20 19:26 EST                                                   =//
+//=  Last Updated: 2026-05-21 12:50 EST                                                   =//
 //=  WIP Changes: Brainstorm and implement more utilities                                 =//
 //=  Recent Changes:                                                                      =//
-//=  - Added "smoots" to the conversion list for utils.trig.haversineDistance             =//
-//=                                                                                       =//
-//=                                                                                       =//
-//=                                                                                       =//
+//=  - Added the following utilities:                                                     =//
+//=    is, fn, date, objects, storage, & color                                            =//
+//=    This was human written and was then formatted to ensure consistancy using          =//
+//=    Google Gemini 3.5 Flash Extended                                                   =//
 //=                                                                                       =//
 //=========================================================================================//
 
@@ -141,6 +141,52 @@ const logging = {
         if (this.getLogLevelWeight() <= 4) console.error("[ERROR]", ...args); 
     }
 };
+
+// Extracted Helper Functions for New Utility Categories (Guideline 2.4)
+function formatTimeAgoDifference(elapsedMilliseconds) {
+    const secondsInterval = Math.floor(elapsedMilliseconds / 1000);
+    if (secondsInterval < 60) {
+        return "just now";
+    }
+    const minutesInterval = Math.floor(secondsInterval / 60);
+    if (minutesInterval < 60) {
+        return `${minutesInterval} minute${minutesInterval === 1 ? "" : "s"} ago`;
+    }
+    const hoursInterval = Math.floor(minutesInterval / 60);
+    if (hoursInterval < 24) {
+        return `${hoursInterval} hour${hoursInterval === 1 ? "" : "s"} ago`;
+    }
+    const daysInterval = Math.floor(hoursInterval / 24);
+    return `${daysInterval} day${daysInterval === 1 ? "" : "s"} ago`;
+}
+
+function calculateDateUnitDifference(differenceMilliseconds, measurementUnit) {
+    const totalSeconds = differenceMilliseconds / 1000;
+    const totalMinutes = totalSeconds / 60;
+    const totalHours = totalMinutes / 60;
+    const totalDays = totalHours / 24;
+    const totalWeeks = totalDays / 7;
+    
+    const normalizedUnit = String(measurementUnit).toLowerCase();
+    if (normalizedUnit === "hours") {
+        return Math.floor(totalHours);
+    }
+    if (normalizedUnit === "weeks") {
+        return Math.floor(totalWeeks);
+    }
+    return Math.floor(totalDays);
+}
+
+function executeFlattenRecursion(currentValue, currentKeyPrefix, accumulatedResult) {
+    if (typeof currentValue === "object" && currentValue !== null) {
+        for (const objectKey of Object.keys(currentValue)) {
+            const deepKeyPath = currentKeyPrefix ? `${currentKeyPrefix}.${objectKey}` : objectKey;
+            executeFlattenRecursion(currentValue[objectKey], deepKeyPath, accumulatedResult);
+        }
+    } else {
+        accumulatedResult[currentKeyPrefix] = currentValue;
+    }
+}
 
 const utils = {
 
@@ -644,6 +690,245 @@ const utils = {
         },
     },
 
+    is: {
+        isEmpty(targetValue) {
+            if (targetValue === null || targetValue === undefined) {
+                return true;
+            }
+            if (typeof targetValue === "string" || Array.isArray(targetValue)) {
+                return targetValue.length === 0;
+            }
+            if (typeof targetValue === "object") {
+                return Object.keys(targetValue).length === 0;
+            }
+            return false;
+        },
+        isEmail(emailString) {
+            if (typeof emailString !== "string") {
+                const err = new TypeError("isEmail() expects a string input argument.");
+                logging.error(err.message);
+                throw err;
+            }
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(emailString);
+        },
+        isValidURL(urlString) {
+            if (typeof urlString !== "string") {
+                const err = new TypeError("isValidURL() expects a string input argument.");
+                logging.error(err.message);
+                throw err;
+            }
+            try {
+                new URL(urlString);
+                return true;
+            } catch (urlError) {
+                return false;
+            }
+        },
+        isPlainObject(targetValue) {
+            if (typeof targetValue !== "object" || targetValue === null) {
+                return false;
+            }
+            const objectPrototype = Object.getPrototypeOf(targetValue);
+            return objectPrototype === Object.prototype || objectPrototype === null;
+        }
+    },
+
+    fn: {
+        debounce(callbackFunction, delayMilliseconds) {
+            if (typeof callbackFunction !== "function") {
+                const err = new TypeError("debounce() expects a function as the first argument.");
+                logging.error(err.message);
+                throw err;
+            }
+            let timeoutIdentifier = null;
+            return function (...argumentsArray) {
+                clearTimeout(timeoutIdentifier);
+                timeoutIdentifier = setTimeout(() => {
+                    callbackFunction.apply(this, argumentsArray);
+                }, delayMilliseconds);
+            };
+        },
+        throttle(callbackFunction, delayMilliseconds) {
+            if (typeof callbackFunction !== "function") {
+                const err = new TypeError("throttle() expects a function as the first argument.");
+                logging.error(err.message);
+                throw err;
+            }
+            let lastExecutionTime = 0;
+            return function (...argumentsArray) {
+                const currentTimestamp = Date.now();
+                if (currentTimestamp - lastExecutionTime >= delayMilliseconds) {
+                    lastExecutionTime = currentTimestamp;
+                    callbackFunction.apply(this, argumentsArray);
+                }
+            };
+        },
+        once(callbackFunction) {
+            if (typeof callbackFunction !== "function") {
+                const err = new TypeError("once() expects a function as the argument.");
+                logging.error(err.message);
+                throw err;
+            }
+            let hasBeenExecuted = false;
+            let executionResult;
+            return function (...argumentsArray) {
+                if (!hasBeenExecuted) {
+                    hasBeenExecuted = true;
+                    executionResult = callbackFunction.apply(this, argumentsArray);
+                }
+                return executionResult;
+            };
+        }
+    },
+
+    date: {
+        timeAgo(targetDate) {
+            const parsedDate = new Date(targetDate);
+            if (isNaN(parsedDate.getTime())) {
+                const err = new Error("Invalid date provided to timeAgo().");
+                logging.error(err.message);
+                throw err;
+            }
+            const elapsedMilliseconds = Date.now() - parsedDate.getTime();
+            return formatTimeAgoDifference(elapsedMilliseconds);
+        },
+        diff(firstDate, secondDate, measurementUnit) {
+            const parsedFirstDate = new Date(firstDate);
+            const parsedSecondDate = new Date(secondDate);
+            if (isNaN(parsedFirstDate.getTime()) || isNaN(parsedSecondDate.getTime())) {
+                const err = new Error("Invalid date provided to diff().");
+                logging.error(err.message);
+                throw err;
+            }
+            const absoluteDifference = Math.abs(parsedFirstDate.getTime() - parsedSecondDate.getTime());
+            return calculateDateUnitDifference(absoluteDifference, measurementUnit);
+        },
+        isBetween(targetDate, startDate, endDate) {
+            const parsedTargetDate = new Date(targetDate);
+            const parsedStartDate = new Date(startDate);
+            const parsedEndDate = new Date(endDate);
+            if (isNaN(parsedTargetDate.getTime()) || isNaN(parsedStartDate.getTime()) || isNaN(parsedEndDate.getTime())) {
+                const err = new Error("Invalid date provided to isBetween().");
+                logging.error(err.message);
+                throw err;
+            }
+            return parsedTargetDate >= parsedStartDate && parsedTargetDate <= parsedEndDate;
+        }
+    },
+
+    objects: {
+        pick(targetObject, keysArray) {
+            if (typeof targetObject !== "object" || targetObject === null || !Array.isArray(keysArray)) {
+                const err = new TypeError("pick() expects an object and an array of keys.");
+                logging.error(err.message);
+                throw err;
+            }
+            const resultObject = {};
+            for (const keyString of keysArray) {
+                if (keyString in targetObject) {
+                    resultObject[keyString] = targetObject[keyString];
+                }
+            }
+            return resultObject;
+        },
+        omit(targetObject, keysArray) {
+            if (typeof targetObject !== "object" || targetObject === null || !Array.isArray(keysArray)) {
+                const err = new TypeError("omit() expects an object and an array of keys.");
+                logging.error(err.message);
+                throw err;
+            }
+            const resultObject = {};
+            for (const keyString of Object.keys(targetObject)) {
+                if (!keysArray.includes(keyString)) {
+                    resultObject[keyString] = targetObject[keyString];
+                }
+            }
+            return resultObject;
+        },
+        flatten(targetObject) {
+            if (typeof targetObject !== "object" || targetObject === null) {
+                const err = new TypeError("flatten() expects a valid object.");
+                logging.error(err.message);
+                throw err;
+            }
+            const flattenedResultObject = {};
+            executeFlattenRecursion(targetObject, "", flattenedResultObject);
+            return flattenedResultObject;
+        }
+    },
+
+    storage: {
+        setWithExpiry(storageKey, storageValue, timeToLiveMilliseconds) {
+            if (typeof storageKey !== "string") {
+                const err = new TypeError("setWithExpiry() expects a string key.");
+                logging.error(err.message);
+                throw err;
+            }
+            const expirationTimestamp = Date.now() + timeToLiveMilliseconds;
+            const standardPayloadObject = {
+                value: storageValue,
+                expiry: expirationTimestamp
+            };
+            localStorage.setItem(storageKey, JSON.stringify(standardPayloadObject));
+        },
+        getWithExpiry(storageKey) {
+            if (typeof storageKey !== "string") {
+                const err = new TypeError("getWithExpiry() expects a string key.");
+                logging.error(err.message);
+                throw err;
+            }
+            const rawStorageItem = localStorage.getItem(storageKey);
+            if (!rawStorageItem) {
+                return null;
+            }
+            const parsedPayloadObject = JSON.parse(rawStorageItem);
+            if (Date.now() > parsedPayloadObject.expiry) {
+                localStorage.removeItem(storageKey);
+                return null;
+            }
+            return parsedPayloadObject.value;
+        }
+    },
+
+    color: {
+        hexToRgb(hexColorString) {
+            if (typeof hexColorString !== "string") {
+                const err = new TypeError("hexToRgb() expects a string.");
+                logging.error(err.message);
+                throw err;
+            }
+            const cleanedHexColor = hexColorString.replace("#", "");
+            if (cleanedHexColor.length !== 6) {
+                const err = new Error("Invalid hex color length.");
+                logging.error(err.message);
+                throw err;
+            }
+            const integerRepresentation = parseInt(cleanedHexColor, 16);
+            return {
+                r: (integerRepresentation >> 16) & 255,
+                g: (integerRepresentation >> 8) & 255,
+                b: integerRepresentation & 255
+            };
+        },
+        rgbToHex(redValue, greenValue, blueValue) {
+            const isComponentOutOfRange = (colorComponent) => colorComponent < 0 || colorComponent > 255;
+            if (isComponentOutOfRange(redValue) || isComponentOutOfRange(greenValue) || isComponentOutOfRange(blueValue)) {
+                const err = new RangeError("RGB values must be between 0 and 255.");
+                logging.error(err.message);
+                throw err;
+            }
+            const bitshiftedHexValue = (1 << 24) + (redValue << 16) + (greenValue << 8) + blueValue;
+            return "#" + bitshiftedHexValue.toString(16).slice(1);
+        },
+        randomHex() {
+            const maximumHexValueBound = 16777215;
+            const randomInteger = Math.floor(Math.random() * maximumHexValueBound);
+            const colorHexRepresentation = randomInteger.toString(16).padStart(6, "0");
+            return "#" + colorHexRepresentation;
+        }
+    }
+
 };
 
 // Asynchronous Diagnostic Self-Test Framework
@@ -759,10 +1044,10 @@ if (isNode) {
     };
 } else if (typeof window !== 'undefined' || typeof self !== 'undefined') {
     const globalContext = typeof window !== 'undefined' ? window : self;
-    globalContext.proishUtils.libraryInfo = libraryInfo,
-    globalContext.proishUtilsVersion = libraryInfo.versionInfo,
-    globalContext.proishUtilsLicense = libraryInfo.license,
+    globalContext[exportKey] = utils;
+    globalContext.proishUtils.libraryInfo = libraryInfo;
+    globalContext.proishUtilsVersion = libraryInfo.versionInfo;
+    globalContext.proishUtilsLicense = libraryInfo.license;
     globalContext.proishUtilsConfig = config;
     globalContext.proishUtilsLogging = logging;
-    globalContext[exportKey] = utils;
 }
