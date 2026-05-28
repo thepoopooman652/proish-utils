@@ -7,24 +7,25 @@
 //=                                  GNU GPL v3 License                                   =//
 //=                                  (GPL-3.0-or-later)                                   =//
 //=                                          ---                                          =//
-//=                                    Version: v2.2.3                                    =//
+//=                                    Version: v2.2.4                                    =//
 //=                                   Created: May 2026                                   =//
 //=                                          ---                                          =//
 //=                                      Version Name:                                    =//
-//=                                  Browser Compatibilty                                 =//
+//=                                  Browser Compatibility                                 =//
 //=                                          ---                                          =//
 //=                                     Version Info:                                     =//
 //=                      This version added compatibility for browsers                    =//
 //=                           With ..2 adding some extra utilities                        =//
 //=                                          ---                                          =//
 //=                                                                                       =//
-//=  Last Updated: 2026-05-21 12:50 EST                                                   =//
+//=  Last Updated: 2026-05-28 18:11 EST                                                   =//
 //=  WIP Changes: Brainstorm and implement more utilities                                 =//
 //=  Recent Changes:                                                                      =//
-//=  - Added the following utilities:                                                     =//
-//=    is, fn, date, objects, storage, & color                                            =//
-//=    This was human written and was then formatted to ensure consistancy using          =//
-//=    Google Gemini 3.5 Flash Extended                                                   =//
+//=  - Optimized strings.reverse                                                          =//
+//=  - Added circular reference protection to deepClone                                    =//
+//=  - Implemented Browser Web Crypto API support for hashing (Async)                      =//
+//=  - Added configurable IP API endpoint                                                  =//
+//=  - Consolidated global browser namespace                                               =//
 //=                                                                                       =//
 //=========================================================================================//
 
@@ -44,14 +45,13 @@
 
 console.log("You (or the person that created the page/tool/software your using) is using a library called Proish Utilities v2, which is created by ProishTheIdiot");
 
-// Environment protection flags
 const isNode = typeof module !== 'undefined' && module.exports;
 
 const libraryInfo = {
     versionInfo: {
-        fileVersion: "proish-utils_v2.2.3",
-        versionNum: "v2.2.3",
-        versionName: "Proish Utilities Version 2.2.3 - Browser Compatibility & Extra Utilities",
+        fileVersion: "proish-utils_v2.2.4",
+        versionNum: "v2.2.4",
+        versionName: "Proish Utilities Version 2.2.4 - Browser Compatibility & Extra Utilities",
     },
     license: { 
         name: "GNU GPL v3 or later",
@@ -63,7 +63,7 @@ const libraryInfo = {
 
 };
 
-console.log(libraryInfo.license.text); // log the required statement from the GNU GPL v3 license
+console.log(libraryInfo.license.text); 
 console.log("Run 'showLicense(); in your console to show the full GNU GPL v3 license, which will be fetched from the GNU website.");
 
 function showLicense() {
@@ -79,10 +79,10 @@ function showLicense() {
 };
 
 const config = {
-    utilsExportName: "proishUtils", // Export identity target
-    testing: false, // TOGGLE THIS FLAG TO TRUE TO ACTIVATE THE SELF-TEST PIPELINE
+    utilsExportName: "proishUtils",
+    testing: false, 
     logging: {
-        level: undefined, // debug, info, warn, error, or undefined to use config.default.logging.level
+        level: undefined, 
     },
     trig: {
         haversineConversions: {
@@ -101,6 +101,9 @@ const config = {
             precision: undefined, 
         },
     },
+    connectionInfo: {
+        ipApiUrl: "https://freeipapi.com/api/json",
+    },
     default: { 
         utilsExportName: "proishUtils",
         testMessage: "This is a test message.", 
@@ -113,10 +116,12 @@ const config = {
                 precision: 5, 
             },
         },
+        connectionInfo: {
+            ipApiUrl: "https://freeipapi.com/api/json",
+        },
     },
 };
 
-// Structured Logging Subsystem
 const logging = {
     logLevels: { debug: 1, info: 2, warn: 3, error: 4, none: 5 },
     
@@ -142,7 +147,6 @@ const logging = {
     }
 };
 
-// Extracted Helper Functions for New Utility Categories (Guideline 2.4)
 function formatTimeAgoDifference(elapsedMilliseconds) {
     const secondsInterval = Math.floor(elapsedMilliseconds / 1000);
     if (secondsInterval < 60) {
@@ -186,6 +190,47 @@ function executeFlattenRecursion(currentValue, currentKeyPrefix, accumulatedResu
     } else {
         accumulatedResult[currentKeyPrefix] = currentValue;
     }
+}
+
+async function executeBrowserHash(algorithm, data) {
+    const encoder = new TextEncoder();
+    const buffer = await crypto.subtle.digest(algorithm, encoder.encode(String(data)));
+    return Array.from(new Uint8Array(buffer))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+}
+
+function executeDeepCloneRecursive(obj, map = new WeakMap()) {
+    if (obj === null || typeof obj !== 'object') {
+        return obj;
+    }
+
+    if (map.has(obj)) {
+        return map.get(obj);
+    }
+
+    if (obj instanceof Date) {
+        return new Date(obj.getTime());
+    }
+    if (obj instanceof RegExp) {
+        return new RegExp(obj.source, obj.flags);
+    }
+
+    const clonedObj = Array.isArray(obj) ? [] : {};
+    map.set(obj, clonedObj);
+
+    if (Array.isArray(obj)) {
+        obj.forEach((item, index) => {
+            clonedObj[index] = executeDeepCloneRecursive(item, map);
+        });
+    } else {
+        for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                clonedObj[key] = executeDeepCloneRecursive(obj[key], map);
+            }
+        }
+    }
+    return clonedObj;
 }
 
 const utils = {
@@ -244,11 +289,7 @@ const utils = {
                 logging.error(err.message);
                 throw err;
             }
-            let reversed = "";
-            for (let i = strVal.length - 1; i >= 0; i--) {
-                reversed += strVal[i];
-            }
-            return reversed;
+            return strVal.split('').reverse().join('');
         },
         trimSpaces(strVal) {
             if (typeof strVal !== "string") {
@@ -333,43 +374,40 @@ const utils = {
             }
         },
         hash: {
-            SHA512(strVal) {
-                if (typeof require === 'undefined') {
-                    const err = new Error("Synchronous SHA512 execution requires a Node.js runtime container.");
-                    logging.error(err.message);
-                    throw err;
-                }
-                try {
-                    return require("crypto").createHash("sha512").update(String(strVal)).digest("hex");
-                } catch (err) {
-                    logging.error("SHA512 hashing failure execution context error details:", err.message);
-                    throw err;
-                }
-            },
-            SHA384(strVal) {
-                if (typeof require === 'undefined') {
-                    const err = new Error("Synchronous SHA384 execution requires a Node.js runtime container.");
-                    logging.error(err.message);
-                    throw err;
-                }
-                try {
-                    return require("crypto").createHash("sha384").update(String(strVal)).digest("hex");
-                } catch (err) {
-                    logging.error("SHA384 hashing failure execution context error details:", err.message);
-                    throw err;
+            async SHA512(strVal) {
+                if (isNode) {
+                    try {
+                        return require("crypto").createHash("sha512").update(String(strVal)).digest("hex");
+                    } catch (err) {
+                        logging.error("SHA512 hashing failure execution context error details:", err.message);
+                        throw err;
+                    }
+                } else {
+                    return await executeBrowserHash("SHA-512", strVal);
                 }
             },
-            SHA256(strVal) {
-                if (typeof require === 'undefined') {
-                    const err = new Error("Synchronous SHA256 execution requires a Node.js runtime container.");
-                    logging.error(err.message);
-                    throw err;
+            async SHA384(strVal) {
+                if (isNode) {
+                    try {
+                        return require("crypto").createHash("sha384").update(String(strVal)).digest("hex");
+                    } catch (err) {
+                        logging.error("SHA384 hashing failure execution context error details:", err.message);
+                        throw err;
+                    }
+                } else {
+                    return await executeBrowserHash("SHA-384", strVal);
                 }
-                try {
-                    return require("crypto").createHash("sha256").update(String(strVal)).digest("hex");
-                } catch (err) {
-                    logging.error("SHA256 hashing failure execution context error details:", err.message);
-                    throw err;
+            },
+            async SHA256(strVal) {
+                if (isNode) {
+                    try {
+                        return require("crypto").createHash("sha256").update(String(strVal)).digest("hex");
+                    } catch (err) {
+                        logging.error("SHA256 hashing failure execution context error details:", err.message);
+                        throw err;
+                    }
+                } else {
+                    return await executeBrowserHash("SHA-256", strVal);
                 }
             },
         },
@@ -590,26 +628,8 @@ const utils = {
             return chunks;
         },
         deepClone(obj) {
-            if (obj === null || typeof obj !== 'object') {
-                return obj;
-            }
-            if (obj instanceof Date) {
-                return new Date(obj.getTime());
-            }
-            if (obj instanceof RegExp) {
-                return new RegExp(obj.source, obj.flags);
-            }
-            if (Array.isArray(obj)) {
-                return obj.map(item => this.deepClone(item));
-            }
-            const clonedObj = {};
-            for (const key in obj) {
-                if (Object.prototype.hasOwnProperty.call(obj, key)) {
-                    clonedObj[key] = this.deepClone(obj[key]);
-                }
-            }
-            logging.debug("deepClone structured tree mapping recursive copy iteration run completed.");
-            return clonedObj;
+            logging.debug("deepClone structural tree mapping recursive copy iteration run initiated.");
+            return executeDeepCloneRecursive(obj);
         }
     },
 
@@ -663,7 +683,8 @@ const utils = {
     connectionInfo: {
         async getUserIP() {
             try {
-                const response = await fetch("https://freeipapi.com/api/json");
+                const apiEndpoint = config.connectionInfo?.ipApiUrl || config.default?.connectionInfo?.ipApiUrl;
+                const response = await fetch(apiEndpoint);
                 if (!response.ok) throw new Error(`HTTP network gateway returned code status ${response.status}`);
                 const data = await response.json();
                 return data.ipAddress;
@@ -674,7 +695,8 @@ const utils = {
         },
         async getUserIpInfo(infoType) {
             try {
-                const response = await fetch("https://freeipapi.com/api/json");
+                const apiEndpoint = config.connectionInfo?.ipApiUrl || config.default?.connectionInfo?.ipApiUrl;
+                const response = await fetch(apiEndpoint);
                 if (!response.ok) throw new Error(`HTTP network gateway returned code status ${response.status}`);
                 const data = await response.json();
                 if (!infoType) {
@@ -931,7 +953,6 @@ const utils = {
 
 };
 
-// Asynchronous Diagnostic Self-Test Framework
 async function runLibraryDiagnostics() {
     console.log("\n=======================================================");
     console.log(`  [DIAGNOSTIC] INITIATING PROISHUTILS INTERNAL SELF-TEST`);
@@ -951,37 +972,32 @@ async function runLibraryDiagnostics() {
         }
     };
 
-    // 1. Strings Validation
     try {
         assert(utils.strings.reverse("matrix") === "xirtam", "strings.reverse()");
         assert(utils.strings.isPalindrome("KayAk") === true, "strings.isPalindrome()");
         assert(utils.strings.trimSpaces(" n o   s p a c e s ") === "nospaces", "strings.trimSpaces()");
     } catch(e) { failed++; console.error("  [FAIL] Strings category suite crashed entirely:", e.message); }
 
-    // 2. Cryptographic Sandbox Check
     try {
         const uuid = utils.cryptoFuncs.genUUID();
         assert(typeof uuid === 'string' && uuid.length === 36, "cryptoFuncs.genUUID()");
-        if (isNode) {
-            assert(typeof utils.cryptoFuncs.hash.SHA256("test") === 'string', "cryptoFuncs.hash.SHA256() [Node Runtime]");
-        }
+        
+        const testHash = await utils.cryptoFuncs.hash.SHA256("test");
+        assert(typeof testHash === 'string', "cryptoFuncs.hash.SHA256() execution check");
     } catch(e) { failed++; console.error("   [FAIL] Crypto category suite crashed entirely:", e.message); }
 
-    // 3. Mathematical Interpolation & Boundaries
     try {
         assert(utils.math.clamp(105, 0, 100) === 100, "math.clamp() processing max boundary");
         assert(utils.math.lerp(10, 20, 0.5) === 15, "math.lerp() midpoint execution");
         assert(utils.math.scale(5, 0, 10, 0, 100) === 50, "math.scale() alignment conversion");
     } catch(e) { failed++; console.error("   [FAIL] Math category suite crashed entirely:", e.message); }
 
-    // 4. Trigonometric Formula Verifications
     try {
         assert(utils.trig.toRad(180) === Math.PI, "trig.toRad() radians conversion matching threshold");
         const distance = utils.trig.haversineDistance(40.7128, -74.0060, 34.0522, -118.2437);
         assert(typeof distance === 'number' && distance > 0, "trig.haversineDistance() arithmetic processing");
     } catch(e) { failed++; console.error("   [FAIL] Trigonometry category suite crashed entirely:", e.message); }
 
-    // 5. Asynchronous Engine Testing
     try {
         const start = Date.now();
         await utils.async.sleep(30);
@@ -997,18 +1013,21 @@ async function runLibraryDiagnostics() {
         assert(recoveryResult === "Payload ok" && failures === 2, "async.retry() resilience recovery automation");
     } catch(e) { failed++; console.error("   [FAIL] Async category suite crashed entirely:", e.message); }
 
-    // 6. Structural Data Arrays & Collections
     try {
         const rawCollection = [1, 2, 3, 4, 5];
         const segmented = utils.collections.chunk(rawCollection, 2);
         assert(segmented.length === 3 && segmented[0].length === 2, "collections.chunk() slicing partitions");
+
+        const circular = { name: "Circular" };
+        circular.self = circular;
+        const clonedCircular = utils.collections.deepClone(circular);
+        assert(clonedCircular.self === clonedCircular, "collections.deepClone() circular reference protection");
 
         const cyclicalSource = { data: { timestamp: new Date() }, active: true };
         const mirroredCopy = utils.collections.deepClone(cyclicalSource);
         assert(mirroredCopy.data.timestamp instanceof Date && mirroredCopy.data !== cyclicalSource.data, "collections.deepClone() deep copy matching isolation parameters");
     } catch(e) { failed++; console.error("   [FAIL] Collections category suite crashed entirely:", e.message); }
 
-    // 7. Context-Aware Client-Side Browsing Checks
     if (typeof document !== 'undefined') {
         try {
             utils.dom.setCookie("proish_test_token", "diagnostics_pass", 1);
@@ -1028,12 +1047,10 @@ async function runLibraryDiagnostics() {
     console.log("=======================================================\n");
 }
 
-// Immediate Test Execution Trigger
 if (config.testing === true) {
     runLibraryDiagnostics().catch(err => console.error("Fatal exception during test compilation run:", err));
 }
 
-// Environment Export Routing
 const exportKey = config.utilsExportName || config.default?.utilsExportName || 'proishUtils';
 
 if (isNode) {
@@ -1044,10 +1061,15 @@ if (isNode) {
     };
 } else if (typeof window !== 'undefined' || typeof self !== 'undefined') {
     const globalContext = typeof window !== 'undefined' ? window : self;
-    globalContext[exportKey] = utils;
-    globalContext.proishUtils.libraryInfo = libraryInfo;
-    globalContext.proishUtilsVersion = libraryInfo.versionInfo;
-    globalContext.proishUtilsLicense = libraryInfo.license;
-    globalContext.proishUtilsConfig = config;
-    globalContext.proishUtilsLogging = logging;
+    
+    const finalExport = {
+        ...utils,
+        libraryInfo: libraryInfo,
+        version: libraryInfo.versionInfo,
+        license: libraryInfo.license,
+        config: config,
+        logging: logging,
+    };
+    
+    globalContext[exportKey] = finalExport;
 }
