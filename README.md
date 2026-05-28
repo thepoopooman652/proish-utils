@@ -8,10 +8,10 @@
 Simply include the script in your HTML file:
 
 ```html
-<script src="proish-utils.js"></script>
+<script src="proish-utils_v2.js"></script>
 <script>
-    // The library is available globally as proishUtils
-    console.log(proishUtils.strings.reverse("Hello!")); 
+    // The library is available globally as utils
+    console.log(utils.strings.reverse("Hello!")); 
 </script>
 ```
 
@@ -21,7 +21,7 @@ const { proishUtils, config } = require('./proish-utils.js');
 
 // Example: Use the crypto hashing tool
 (async () => {
-    const hash = await proishUtils.cryptoFuncs.hash.SHA256("secret-data");
+    const hash = await utils.cryptoFuncs.hash.SHA256("secret-data");
     console.log(hash);
 })();
 ```
@@ -126,9 +126,9 @@ const { proishUtils, config } = require('./proish-utils.js');
 You can customize the behavior of the library by modifying the `config` object before calling the utilities.
 
 ```javascript
-proishUtils.config.logging.level = "debug"; // Show all logs
-proishUtils.config.text.slugify.separator = "_"; // Slugs become "hello_world"
-proishUtils.config.validation.passwordRequirements.minLength = 12; // Require 12 chars
+utils.config.logging.level = "debug"; // Show all logs
+utils.config.text.slugify.separator = "_"; // Slugs become "hello_world"
+utils.config.validation.passwordRequirements.minLength = 12; // Require 12 chars
 ```
 
 ## 📜 License
